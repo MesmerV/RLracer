@@ -1,5 +1,5 @@
 import numpy as np
-import os
+import os, sys
 import gym
 from gym.wrappers import RecordVideo
 from stable_baselines3 import DQN, DDPG, PPO
@@ -7,7 +7,10 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.noise import NormalActionNoise
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
+sys.path.insert(1, "./highway-env")
 import highway_env
+
+
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -15,7 +18,7 @@ warnings.filterwarnings("ignore")
 
 
 TRAIN = False
-
+MANUAL = False
 
 if __name__ == '__main__':
 
@@ -39,29 +42,30 @@ if __name__ == '__main__':
 
         # Train the model
         model.learn(total_timesteps=int(1e5))
-        model.save("racetrack_ppo/model")
+        model.save("racetrack_ppo/model_morand")
         del model
 
     # Run the algorithm
-    model = PPO.load("racetrack_ppo/model", env=env)
-
+    model = PPO.load("racetrack_ppo/model_morand", env=env)
     env = gym.make("racetrack-v0")
+
     
     # Config environment
     env.configure({"collision_reward": -2,
                     "lane_centering_cost": 3,
                     "lane_centering_reward": 1,
                     "controlled_vehicles": 1,
-                    "other_vehicles": 10,
+                    "other_vehicles": 1,
                     "screen_width": 600,
                     "show_trajectories": True,
                     "screen_heigth": 600})
 
-    env.config["action"]["longitudinal"] = True
+    if MANUAL:
+        env.config["action"]["longitudinal"] = True
+        env.config["manual_control"] = True
 
 
     # for manual control
-    env.config["manual_control"] = True
 
     #apply changes
     env.reset()
