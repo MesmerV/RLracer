@@ -73,7 +73,7 @@ if __name__ == '__main__':
     
     env = gym.make("racetrack-v0")
     env.config["controlled_vehicles"] = 5
-    env.config["manual_control"]= True
+    env.config["manual_control"]= False
     
     env.config['other_vehicles']= 7
     env.config["action"] = {"type": "MultiAgentAction",
@@ -95,10 +95,9 @@ if __name__ == '__main__':
                 "as_image": False,
                 "align_to_vehicle_axes": True
             }
-    n_actions = 4
-    obs, info = env.reset()
-    n1, n2, n3 = obs[0].shape
-    n_observations = n1*n2*n3
+    
+    
+    
     env = RecordVideo(env, video_folder="racetrack_ppo/videos", episode_trigger=lambda e: True)
     env.unwrapped.set_record_video_wrapper(env)
     
