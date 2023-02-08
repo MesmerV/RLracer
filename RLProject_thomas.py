@@ -72,7 +72,7 @@ if __name__ == '__main__':
     # Run the algorithm
     
     env = gym.make("racetrack-v0")
-    env.config["controlled_vehicles"] = 5
+    env.config["controlled_vehicles"] = 2
     env.config["manual_control"]= False
     
     env.config['other_vehicles']= 7
@@ -219,7 +219,7 @@ if __name__ == '__main__':
         # Initialize the environment and get it's state
         state, info = env.reset()
         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
-        print(state.shape)
+        state = state[0]
         for t in count():
             action = select_action(state)
             print(action)
