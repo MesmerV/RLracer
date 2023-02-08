@@ -95,6 +95,10 @@ if __name__ == '__main__':
                 "as_image": False,
                 "align_to_vehicle_axes": True
             }
+    n_actions = 4
+    obs, info = env.reset()
+    n1, n2, n3 = obs[0].shape
+    n_observations = n1*n2*n3
     
     
     
