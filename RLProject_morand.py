@@ -54,12 +54,24 @@ if __name__ == '__main__':
     env.configure({"collision_reward": -2,
                     "lane_centering_cost": 3,
                     "lane_centering_reward": 1,
-                    "controlled_vehicles": 3,
-                    "other_vehicles": 2,
+                    "controlled_vehicles": 2,
+                    "other_vehicles": 4,
                     "screen_width": 800,
                     "show_trajectories": True,
                     "screen_heigth": 600})
-
+    
+    """
+    env.configure({
+        "action": {
+                    "type": "ContinuousAction",
+                    "longitudinal": False,
+                    "lateral": True,
+                    "target_speeds": [0, 5, 10]  
+                    },
+          })
+    
+    
+    """
     env.configure({
         "action": {
                 "type": "MultiAgentAction",
@@ -86,11 +98,11 @@ if __name__ == '__main__':
                         },
                 }
             })
-
+    
 
     # for manual control
     if MANUAL:
-        env.config["action"]["longitudinal"] = True
+        env.config["action"]["longitudinal"] = False
         env.config["manual_control"] = False
 
 
@@ -112,9 +124,9 @@ if __name__ == '__main__':
         # Predict
 
         # Dispatch the observations to the model to get the tuple of actions
-        actions = tuple(model.predict(obs_i) for obs_i in obs)
-
-        print(actions)
+        actions = tuple(model.predict(obs_i)[0] for obs_i in obs)
+        #actions, _states = model.predict(obs, deterministic=True)
+        
         # Execute the actions
         obs, reward, done, truncated, info = env.step(actions)
         
