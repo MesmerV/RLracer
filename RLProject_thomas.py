@@ -219,6 +219,7 @@ if __name__ == '__main__':
         # Initialize the environment and get it's state
         state, info = env.reset()
         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+        print(state.shape)
         for t in count():
             action = select_action(state)
             print(action)
