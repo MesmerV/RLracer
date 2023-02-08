@@ -40,10 +40,10 @@ if __name__ == '__main__':
     
     env = gym.make("racetrack-v0")
     env.config["controlled_vehicles"] = 5
-    env.config["manual_control"]= True
+    env.config["manual_control"]= False
     
     env.config['other_vehicles']= 7
-    """env.config["action"] = {"type": "MultiAgentAction",
+    env.config["action"] = {"type": "MultiAgentAction",
                 "longitudinal":True,
                 "lateral": True,
                 "target_speeds": [0, 5, 10],
@@ -61,7 +61,7 @@ if __name__ == '__main__':
                 "grid_step": [3, 3],
                 "as_image": False,
                 "align_to_vehicle_axes": True
-            }"""
+            }
     
     
     

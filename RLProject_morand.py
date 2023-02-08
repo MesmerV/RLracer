@@ -54,18 +54,46 @@ if __name__ == '__main__':
     env.configure({"collision_reward": -2,
                     "lane_centering_cost": 3,
                     "lane_centering_reward": 1,
-                    "controlled_vehicles": 1,
-                    "other_vehicles": 1,
-                    "screen_width": 600,
+                    "controlled_vehicles": 3,
+                    "other_vehicles": 2,
+                    "screen_width": 800,
                     "show_trajectories": True,
                     "screen_heigth": 600})
 
-    if MANUAL:
-        env.config["action"]["longitudinal"] = True
-        env.config["manual_control"] = True
+    env.configure({
+        "action": {
+                "type": "MultiAgentAction",
+                    "action_config": {
+                            "type": "ContinuousAction",
+                            "longitudinal": False,
+                            "lateral": True,
+                            "target_speeds": [0, 5, 10]  
+                            }
+            },
+          })
+
+    #config multi-observation
+    env.configure({
+        "observation": {
+                "type": "MultiAgentObservation",
+                    "observation_config": {
+                        "type": "OccupancyGrid",
+                        "features": ['presence', 'on_road'],
+                        "grid_size": [[-18, 18], [-18, 18]],
+                        "grid_step": [3, 3],
+                        "as_image": False,
+                        "align_to_vehicle_axes": True
+                        },
+                }
+            })
 
 
     # for manual control
+    if MANUAL:
+        env.config["action"]["longitudinal"] = True
+        env.config["manual_control"] = False
+
+
 
     #apply changes
     env.reset()
@@ -78,11 +106,17 @@ if __name__ == '__main__':
     
     done = truncated = False
     obs, info = env.reset()
+    print("number of obs: ",len(obs))
+
     while not (done or truncated):
         # Predict
-        action, _states = model.predict(obs, deterministic=True)
-        # Get reward
-        obs, reward, done, truncated, info = env.step(action)
+
+        # Dispatch the observations to the model to get the tuple of actions
+        actions = tuple(model.predict(obs_i) for obs_i in obs)
+
+        print(actions)
+        # Execute the actions
+        obs, reward, done, truncated, info = env.step(actions)
         
         # Render
         env.render()
