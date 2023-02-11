@@ -38,7 +38,7 @@ def CreateEnv():
     env.configure({
         "action": {
                     "type": "ContinuousAction",
-                    "longitudinal": False,
+                    "longitudinal": True,
                     "lateral": True,
                     "target_speeds": [0, 5, 10]   
                 },
@@ -87,8 +87,8 @@ def ConfigureMultiAgent(env,agent_num):
 if __name__ == '__main__':
 
     n_cpu = os.cpu_count() - 1
-    env = make_vec_env("racetrack-v0", n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
-    #env = CreateEnv()
+    #env = make_vec_env("racetrack-v0", n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
+    env = CreateEnv()
     n_cpu = 1
 
     #If train, create new model and train it
