@@ -51,9 +51,9 @@ class DQN(nn.Module):
         return self.layer8(x)
 BATCH_SIZE = 128
 GAMMA = 0.99
-EPS_START = 0.95
+EPS_START = 0.90
 EPS_END = 0.01
-EPS_DECAY = 100000
+EPS_DECAY = 10000
 TAU = 0.005
 LR = 1e-4
 
@@ -70,6 +70,7 @@ def plot_durations(show_result=False):
         plt.xlabel('Episode')
         plt.ylabel('Duration')
         plt.plot(durations_t.numpy())
+        plt.plot(gain_globaux)
         # Take 100 episode averages and plot them too
         if len(durations_t) >= 100:
             means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
@@ -254,8 +255,9 @@ if __name__ == '__main__':
         num_episodes = 600
     else:
         num_episodes = 50
-
+    gain_globaux = []
     for i_episode in range(num_episodes):
+
         # Initialize the environment and get it's state
         if (i_episode == 120):
             env.config["duration"] = 30
@@ -304,6 +306,7 @@ if __name__ == '__main__':
             target_net.load_state_dict(target_net_state_dict)
 
             if done:
+                gain_globaux.append(gain)
                 episode_durations.append(t + 1)
                 plot_durations()
                 break
