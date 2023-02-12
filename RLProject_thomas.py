@@ -2,9 +2,7 @@ import numpy as np
 import gym
 from gym.wrappers import RecordVideo
 from stable_baselines3 import DQN, DDPG, PPO
-from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.noise import NormalActionNoise
-from stable_baselines3.common.vec_env import SubprocVecEnv
+
 from collections import namedtuple, deque
 import highway_env
 import torch
@@ -27,30 +25,64 @@ class DQN(nn.Module):
 
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
+        self.n_input = n_observations
         self.layer1 = nn.Linear(n_observations, 128)
         self.layer2 = nn.Linear(128, 256)
-        self.layer3 = nn.Linear(256,128)
-        self.layer4 = nn.Linear(128, n_actions)
+        self.layer3 = nn.Linear(256, 512)
+        self.layer4 = nn.Linear(512, 512)
+        self.layer5 = nn.Linear(512, 512)
+        self.layer6 = nn.Linear(512, 256)
+        self.layer7 = nn.Linear(256,128)
+        self.layer8 = nn.Linear(128, n_actions)
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
     def forward(self, x):
-        
+        x = x.view(-1,self.n_input)
+        x = x.float()
         x = F.relu(self.layer1(x))
         x = F.relu(self.layer2(x))
         x = F.relu(self.layer3(x))
-        return self.layer4(x)
+        x = F.relu(self.layer4(x))
+        x = F.relu(self.layer5(x))
+        x = F.relu(self.layer6(x))
+        x = F.relu(self.layer7(x))
+
+        return self.layer8(x)
 BATCH_SIZE = 128
 GAMMA = 0.99
-EPS_START = 0.9
-EPS_END = 0.05
-EPS_DECAY = 1000
+EPS_START = 0.95
+EPS_END = 0.01
+EPS_DECAY = 100000
 TAU = 0.005
 LR = 1e-4
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
+def plot_durations(show_result=False):
+        plt.figure(1)
+        durations_t = torch.tensor(episode_durations, dtype=torch.float)
+        if show_result:
+            plt.title('Result')
+        else:
+            plt.clf()
+            plt.title('Training...')
+        plt.xlabel('Episode')
+        plt.ylabel('Duration')
+        plt.plot(durations_t.numpy())
+        # Take 100 episode averages and plot them too
+        if len(durations_t) >= 100:
+            means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
+            means = torch.cat((torch.zeros(99), means))
+            plt.plot(means.numpy())
 
+        plt.pause(0.001)  # pause a bit so that plots are updated
+        if is_ipython:
+            if not show_result:
+                display.display(plt.gcf())
+                display.clear_output(wait=True)
+            else:
+                display.display(plt.gcf())
 
 class ReplayMemory(object):
 
@@ -75,8 +107,11 @@ if __name__ == '__main__':
     env = gym.make("racetrack-v0")
     env.config["controlled_vehicles"] = 1
     env.config["manual_control"]= False
+    env.config["duration"] =25
+    env.config["lane_centering_cost"] = 4
     
-    env.config['other_vehicles']= 7
+    
+    env.config['other_vehicles']= 2
     """env.config["action"] = {"type": "MultiAgentAction",
                 "longitudinal":True,
                 "lateral": True,
@@ -99,6 +134,9 @@ if __name__ == '__main__':
     n_actions = 2
     obs, info = env.reset()
     n1, n2, n3 = obs.shape
+    print("n1 : "+str(n1))
+    print("n2 : "+str(n2))
+    print("n3 : "+str(n3))
     n_observations = n1*n2*n3
     
     
@@ -130,15 +168,14 @@ if __name__ == '__main__':
                 # t.max(1) will return the largest column value of each row.
                 # second column on max result is index of where max element was
                 # found, so we pick action with the larger expected reward.
-                print(state.shape)
-                state = torch.flatten(state)
-                print(policy_net(state))
-                act = policy_net(state)
-                accel, angle = act[0], act[1]
-                accel = accel.to("cpu")
-                angle = angle.to("cpu")
                 
-                return [accel, angle]
+                
+                act = policy_net(state)
+                accel, angle = act[0][0], act[0][1]
+                """accel = accel.to("cpu")
+                angle = angle.to("cpu")"""
+                
+                return torch.tensor([accel.item(), angle.item()], device="cpu", dtype=torch.long)
         else:
             accel = np.random.uniform(-5,5)
             angle = np.random.uniform(-.0785, 0.785)
@@ -150,30 +187,7 @@ if __name__ == '__main__':
     episode_durations = []
     
 
-    def plot_durations(show_result=False):
-        plt.figure(1)
-        durations_t = torch.tensor(episode_durations, dtype=torch.float)
-        if show_result:
-            plt.title('Result')
-        else:
-            plt.clf()
-            plt.title('Training...')
-        plt.xlabel('Episode')
-        plt.ylabel('Duration')
-        plt.plot(durations_t.numpy())
-        # Take 100 episode averages and plot them too
-        if len(durations_t) >= 100:
-            means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-            means = torch.cat((torch.zeros(99), means))
-            plt.plot(means.numpy())
-
-        plt.pause(0.001)  # pause a bit so that plots are updated
-        if is_ipython:
-            if not show_result:
-                display.display(plt.gcf())
-                display.clear_output(wait=True)
-            else:
-                display.display(plt.gcf())
+    
     
     
     def optimize_model():
@@ -191,17 +205,27 @@ if __name__ == '__main__':
                                             batch.next_state)), device=device, dtype=torch.bool)
         non_final_next_states = torch.cat([s for s in batch.next_state
                                                     if s is not None])
-        print(batch.state.shape)
-        print(batch.state[0].shape)
+        
         state_batch = torch.cat(batch.state)
+       
+        
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
-        state_action_values = policy_net(state_batch).gather(1, action_batch)
-
+        
+        
+        state_batch = state_batch.view((-1,12,12))
+        
+        #state_action_values = policy_net(state_batch)
+        action_batch = action_batch.to(device)
+        
+        action_batch = action_batch.reshape((-1,2))
+        
+        state_action_values = policy_net(state_batch)
+        #state_action_values = state_action_values.gather(1,action_batch)
         # Compute V(s_{t+1}) for all next states.
         # Expected values of actions for non_final_next_states are computed based
         # on the "older" target_net; selecting their best reward with max(1)[0].
@@ -209,7 +233,10 @@ if __name__ == '__main__':
         # state value or 0 in case the state was final.
         next_state_values = torch.zeros(BATCH_SIZE, device=device)
         with torch.no_grad():
+            
+            #next_state_values[non_final_mask] = target_net(non_final_next_states)
             next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0]
+            
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * GAMMA) + reward_batch
 
@@ -230,21 +257,34 @@ if __name__ == '__main__':
 
     for i_episode in range(num_episodes):
         # Initialize the environment and get it's state
+        if (i_episode == 120):
+            env.config["duration"] = 30
+        if (i_episode == 300):
+            env.config["duration"] = 45
+        if (i_episode == 400):
+            env.config["duration"] = 60
+        if (i_episode == 450):
+            env.config["duration"] = 90
         state, info = env.reset()
         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
-        state = state[0]
+        state = torch.tensor(state[0])
+        gain = 0
         for t in count():
             action = select_action(state)
             accel, angle = action[0], action[1]
             observation, reward, terminated, truncated, _ = env.step([accel, angle])
+            gain += reward
+            
             reward = torch.tensor([reward], device=device)
             done = terminated or truncated
-
             if terminated:
                 next_state = None
             else:
                 next_state = torch.tensor(observation, dtype=torch.float32, device=device).unsqueeze(0)
-
+                next_state = next_state[0]
+                
+            
+            #action = torch.Tensor(action)
             # Store the transition in memory
             memory.push(state, action, next_state, reward)
 
@@ -253,6 +293,7 @@ if __name__ == '__main__':
 
             # Perform one step of the optimization (on the policy network)
             optimize_model()
+            
 
             # Soft update of the target network's weights
             # θ′ ← τ θ + (1 −τ )θ′
