@@ -15,6 +15,7 @@ import warnings
 import matplotlib
 import matplotlib.pyplot as plt
 from itertools import count
+import random
 warnings.filterwarnings("ignore")
 is_ipython = 'inline' in matplotlib.get_backend()
 if is_ipython:
@@ -72,19 +73,19 @@ if __name__ == '__main__':
     # Run the algorithm
     
     env = gym.make("racetrack-v0")
-    env.config["controlled_vehicles"] = 2
+    env.config["controlled_vehicles"] = 1
     env.config["manual_control"]= False
     
     env.config['other_vehicles']= 7
-    env.config["action"] = {"type": "MultiAgentAction",
+    """env.config["action"] = {"type": "MultiAgentAction",
                 "longitudinal":True,
                 "lateral": True,
                 "target_speeds": [0, 5, 10],
                 "action_config": {
                 "type": "ContinuousAction",
                 }
-    }
-    env.config["observation"] = {
+    }"""
+    """env.config["observation"] = {
                 "type": "MultiAgentObservation",
                 "observation_config": {
                 "type": "OccupancyGrid",
@@ -94,10 +95,10 @@ if __name__ == '__main__':
                 "grid_step": [3, 3],
                 "as_image": False,
                 "align_to_vehicle_axes": True
-            }
-    n_actions = 4
+            }"""
+    n_actions = 2
     obs, info = env.reset()
-    n1, n2, n3 = obs[0].shape
+    n1, n2, n3 = obs.shape
     n_observations = n1*n2*n3
     
     
@@ -129,9 +130,19 @@ if __name__ == '__main__':
                 # t.max(1) will return the largest column value of each row.
                 # second column on max result is index of where max element was
                 # found, so we pick action with the larger expected reward.
-                return policy_net(state).max(1)[1].view(1, 1)
+                print(state.shape)
+                state = torch.flatten(state)
+                print(policy_net(state))
+                act = policy_net(state)
+                accel, angle = act[0], act[1]
+                accel = accel.to("cpu")
+                angle = angle.to("cpu")
+                
+                return [accel, angle]
         else:
-            return torch.tensor([[env.action_space.sample()]], device=device, dtype=torch.long)
+            accel = np.random.uniform(-5,5)
+            angle = np.random.uniform(-.0785, 0.785)
+            return torch.tensor([accel,angle], device="cpu", dtype=torch.long)
     
     
     
@@ -180,6 +191,8 @@ if __name__ == '__main__':
                                             batch.next_state)), device=device, dtype=torch.bool)
         non_final_next_states = torch.cat([s for s in batch.next_state
                                                     if s is not None])
+        print(batch.state.shape)
+        print(batch.state[0].shape)
         state_batch = torch.cat(batch.state)
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
@@ -222,8 +235,8 @@ if __name__ == '__main__':
         state = state[0]
         for t in count():
             action = select_action(state)
-            print(action)
-            observation, reward, terminated, truncated, _ = env.step(action.item())
+            accel, angle = action[0], action[1]
+            observation, reward, terminated, truncated, _ = env.step([accel, angle])
             reward = torch.tensor([reward], device=device)
             done = terminated or truncated
 
