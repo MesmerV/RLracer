@@ -18,6 +18,7 @@ warnings.filterwarnings("ignore")
 
 
 TRAIN = False
+USE_PREVIOUS_MODEL = True
 MANUAL = False
 
 def CreateEnv():
@@ -25,12 +26,14 @@ def CreateEnv():
     env = gym.make("racetrack-v0")
 
     
-    # General Config
-    env.configure({"collision_reward": -2,
-                    "lane_centering_cost": 3,
+    # General Config ( configure in racetrack_env for training)
+    env.configure({ "collision_reward": -1.5,
+                    "lane_centering_cost": 4,
                     "lane_centering_reward": 1,
-                    "controlled_vehicles": 1,
-                    "other_vehicles": 5,
+                    "reward_speed_range": [10, 30],
+                    "high_speed_reward": 0.5,
+                    "action_reward": -0.4,
+                    
                     "screen_width": 800,
                     "show_trajectories": False,
                     "screen_heigth": 600})
@@ -40,15 +43,14 @@ def CreateEnv():
                     "type": "ContinuousAction",
                     "longitudinal": True,
                     "lateral": True,
-                    "target_speeds": [0, 5, 10]   
+                    "target_speeds": [0, 8, 13]   
                 },
           })
     
 
     # for manual control
     if MANUAL:
-        env.config["action"]["longitudinal"] = False
-        env.config["manual_control"] = False
+        env.config["manual_control"] = True
 
     #apply changes
     env.reset()
@@ -87,14 +89,17 @@ def ConfigureMultiAgent(env,agent_num):
 if __name__ == '__main__':
 
     n_cpu = os.cpu_count() - 1
-    #env = make_vec_env("racetrack-v0", n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
-    env = CreateEnv()
-    n_cpu = 1
+    #env = CreateEnv()
+    env = make_vec_env("racetrack-v0", n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
+    
 
     #If train, create new model and train it
     if TRAIN:
         batch_size = 64
-        model = PPO("MlpPolicy",
+        
+        
+        if not USE_PREVIOUS_MODEL:
+            model = PPO("MlpPolicy",
                 env,
                 policy_kwargs=dict(net_arch=[dict(pi=[256, 256], vf=[256, 256])]),
                 n_steps=batch_size * 12 // n_cpu,
@@ -102,20 +107,24 @@ if __name__ == '__main__':
                 n_epochs=10,
                 learning_rate=5e-4,
                 gamma=0.9,
-                verbose=2,
+                verbose=3,
                 tensorboard_log="racetrack_ppo/")
+        else:
+            #for further training of previous model
+            model = PPO.load("racetrack_ppo/model_test", env=env)
 
         # Train the model
-        model.learn(total_timesteps=int(1e2))
+        model.learn(total_timesteps=int(2e5))
         model.save("racetrack_ppo/model_test")
         del model
 
     # Run the algorithm
-    model = PPO.load("racetrack_ppo/model_morand", env=env)
+    model = PPO.load("racetrack_ppo/model_test", env=env)
     
     # dl racetrack as baseline
     env = CreateEnv()
-    ConfigureMultiAgent(env,3)
+    ConfigureMultiAgent(env,1)
+
 
     env = RecordVideo(env, video_folder="racetrack_ppo/videos", episode_trigger=lambda e: True)
     env.unwrapped.set_record_video_wrapper(env)
