@@ -17,8 +17,8 @@ warnings.filterwarnings("ignore")
 
 
 
-TRAIN = False
-USE_PREVIOUS_MODEL = True
+TRAIN = True
+USE_PREVIOUS_MODEL = False
 MANUAL = False
 
 def CreateEnv():
