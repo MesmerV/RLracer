@@ -7,14 +7,13 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.noise import NormalActionNoise
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
+
 sys.path.insert(1, "./highway-env")
 import highway_env
 
 
 import warnings
 warnings.filterwarnings("ignore")
-
-
 
 
 TRAIN = True
@@ -31,7 +30,7 @@ def CreateEnv():
                     "lane_centering_cost": 4,
                     "lane_centering_reward": 1,
                     "reward_speed_range": [10, 30],
-                    "high_speed_reward": 0.5,
+                    "high_speed_reward": 1,
                     "action_reward": -0.4,
                     
                     "screen_width": 800,
@@ -93,7 +92,7 @@ if __name__ == '__main__':
     env = make_vec_env("racetrack-v0", n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
     
 
-    #If train, create new model and train it
+    # If TRAIN, create new model and train it
     if TRAIN:
         batch_size = 64
         
@@ -110,11 +109,11 @@ if __name__ == '__main__':
                 verbose=3,
                 tensorboard_log="racetrack_ppo/")
         else:
-            #for further training of previous model
+            # for further training of previous model
             model = PPO.load("racetrack_ppo/model_test", env=env)
 
         # Train the model
-        model.learn(total_timesteps=int(2e5))
+        model.learn(total_timesteps=int(1e5))
         model.save("racetrack_ppo/model_test")
         del model
 

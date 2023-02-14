@@ -2,11 +2,10 @@
 
 
 pip install pygame
-pip install gym
 pip install git+https://github.com/carlosluis/stable-baselines3@fix_tests
 pip install moviepy
 
 #install of the custom fork of highway_env
 
 git clone 
-pip install -e ./highway-env
+pip install -e ./highway_env
