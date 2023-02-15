@@ -4,11 +4,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from collections import deque
+import multiprocessing as mp
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 import warnings
 warnings.filterwarnings("ignore")
+learning_rate = 1e-3
+n_episode = 5000
 # Définir le modèle de l'agent
 class model(nn.Module):
     def __init__(self, n_observations, n_actions):
@@ -37,6 +39,49 @@ class model(nn.Module):
         x = F.relu(self.layer7(x))
 
         return self.layer8(x)
+class A2C():
+    def __init__(self, n_observations, n_actions):
+        self.actor = model(n_observations, n_actions).to(device)
+        self.critic = model(n_observations+n_actions, 1).to(device)
+        self.optimizer_actor = optim.Adam(self.actor.parameters(), lr=learning_rate)
+        self.optimizer_critic = optim.Adam(self.critic.parameters(), lr= learning_rate)
+        self.loss_fn = nn.MSELoss()
+    def get_q_value(self,critic_input):
+        return self.critic(critic_input)
+    
+    def get_action(self,state, episode):
+        
+        std_v = 1 -0.5 *episode/n_episode
+        accel, angle = self.actor(state)[0]
+        accel =  torch.normal(accel, std=std_v)
+        accel = torch.clamp(accel, -5, 5)
+
+        std_theta = 0.3 - (0.02-0.3)*episode/n_episode
+        angle =  torch.normal(angle, std=std_theta)
+        angle = torch.clamp(angle, -0.78, 0.78)
+
+        actions = torch.tensor([accel.item(), angle.item()], device=device, dtype=torch.long)
+        
+        
+        copy = [accel.item(), angle.item()]
+        return actions, copy
+    
+    def update_critics(self,q_value, reward):
+        self.optimizer_critic.zero_grad()
+        q_value_loss = self.loss_fn(q_value[0], reward)
+        q_value_loss.requires_grad = True
+        
+        q_value_loss.backward()
+        self.optimizer_critic.step()
+        return q_value_loss
+
+    def update_actor(self, q_value):
+        self.optimizer_actor.zero_grad()
+        policy_loss = -q_value.mean()
+        policy_loss.requires_grad = True
+        policy_loss.backward()
+        self.optimizer_actor.step()
+        return policy_loss
 
 # Initialiser l'environnement
 
@@ -46,59 +91,26 @@ env.config["controlled_vehicles"] = 1
 env.config["manual_control"]= False
 env.config["duration"] =10
 env.config["lane_centering_cost"] = 10
-
-
 env.config['other_vehicles']= 0
 env.config["action"] = {
-                "type": "ContinuousAction",
-                "longitudinal":True,
-                "lateral": True,
-                "target_speeds": [0, 5, 10,15,20]
-            }
-
-"""env.config["observation"] = {
-                "type": "OccupancyGrid",
-                "features": ['presence','on_road'],
-                "grid_size": [[-50, 50], [-50, 50 ]],
-                "grid_step": [3,3],
-                "as_image": False,
-                "align_to_vehicle_axes": True
-
-}"""
-env.config["observation"] = {
-                "type": "Kinematics",
-                "features": ['presence', "x", "y", "vx", "vy", "long_off", "lat_off"],
-                "features_range": {
-                    "x": [-100, 100],
-                    "y": [-100, 100],
-                    "vx": [-20, 20],
-                    "vy": [-20, 20]
-                },
-                "absolute": False,
-                "order": "sorted"
-
-}
-"""env.config["action"] = {"type": "MultiAgentAction",
+            "type": "ContinuousAction",
             "longitudinal":True,
             "lateral": True,
-            "target_speeds": [0, 5, 10],
-            "action_config": {
-            "type": "ContinuousAction",
-            }
-}"""
-"""env.config["observation"] = {
-            "type": "MultiAgentObservation",
-            "observation_config": {
-            "type": "OccupancyGrid",
-            },
-            "features": ['presence', 'on_road'],
-            "grid_size": [[-18, 18], [-18, 18]],
-            "grid_step": [3, 3],
-            "as_image": False,
-            "align_to_vehicle_axes": True
-        }"""
+            "target_speeds": [0, 5, 10,15,20]
+        }
+env.config["observation"] = {
+                    "type": "Kinematics",
+                    "features": ['presence', "x", "y", "vx", "vy", "long_off", "lat_off"],
+                    "features_range": {
+                        "x": [-100, 100],
+                        "y": [-100, 100],
+                        "vx": [-20, 20],
+                        "vy": [-20, 20]
+                    },
+                    "absolute": False,
+                    "order": "sorted"
 
-
+    }
 obs, info = env.reset()
 try:
     n1, n2, n3 = obs.shape
@@ -108,110 +120,124 @@ except:
     state_size = n1*n2
 action_size = 2
 
-actor = model(state_size, action_size).to(device)
-critic = model(state_size + action_size, 1).to(device)
 
 
-# Définir les hyperparamètres
-learning_rate = 5e-4
-memory_size = 1000000
-batch_size = 64
-gamma = 0.99
-epsilon = 1.0
-epsilon_decay = 0.995
-epsilon_min = 0.01
-
-# Initialiser la mémoire
 
 
-# Définir l'optimiseur
-optimizer_actor = optim.Adam(actor.parameters(), lr=learning_rate)
-optimizer_critic = optim.Adam(critic.parameters(), lr= learning_rate)
 
-def select_action(actor, state):
-    accel, angle = actor(state)[0]
-    
-    accel =  torch.normal(accel, std=0.5)
-    accel = torch.clamp(accel, -2, 2)
 
-    angle =  torch.normal(angle, std=0.07)
-    angle = torch.clamp(angle, -0.78, 0.78)
 
-    actions = torch.tensor([accel.item(), angle.item()], device=device, dtype=torch.long)
-    
-    
-    copy = [accel.item(), angle.item()]
-    return actions, copy
+
+
     
 torch.set_grad_enabled(True)
-loss_fn = nn.MSELoss()
-gains_totaux = []   
-writer = SummaryWriter() 
-# Boucle d'entraînement de l'agent
-for i_episode in range(1000):
-    if (i_episode == 120):
-        env.config["duration"] = 30
-    if (i_episode == 300):
-        env.config["duration"] = 45
-    if (i_episode == 400):
-        env.config["duration"] = 60
-    if (i_episode == 450):
-        env.config["duration"] = 90
-    state, info = env.reset()
+def train(agent, seed):
     
-    state = torch.tensor(state, dtype=torch.float32)
-    done = False
-    gains = []
-    losses = []
-    while not done:
-        # Choisir une action
-        long, lat = state[0][-2:]
+    env = gym.make("racetrack-v0")
+    env.config["controlled_vehicles"] = 1
+    env.config["manual_control"]= False
+    env.config["duration"] =10
+    env.config["lane_centering_cost"] = 10
+    env.config['other_vehicles']= 0
+    env.config["action"] = {
+                    "type": "ContinuousAction",
+                    "longitudinal":True,
+                    "lateral": True,
+                    "target_speeds": [0, 5, 10,15,20]
+                }
+    env.config["observation"] = {
+                    "type": "Kinematics",
+                    "features": ['presence', "x", "y", "vx", "vy", "long_off", "lat_off"],
+                    "features_range": {
+                        "x": [-100, 100],
+                        "y": [-100, 100],
+                        "vx": [-20, 20],
+                        "vy": [-20, 20]
+                    },
+                    "absolute": False,
+                    "order": "sorted"
+
+    }
+
+
+
+
+    gains_totaux = []   
+    writer = SummaryWriter() 
+    # Boucle d'entraînement de l'agent
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    for i_episode in range(n_episode):
+        if (i_episode == 120):
+            env.config["duration"] = 30
+        if (i_episode == 300):
+            env.config["duration"] = 45
+        if (i_episode == 400):
+            env.config["duration"] = 60
+        if (i_episode == 450):
+            env.config["duration"] = 90
+        state, info = env.reset()
+        if (i_episode % 1000 == 0):
+            torch.save(agent.actor.state_dict(), "actor.pth")
+            torch.save(agent.critic.state_dict(), "critic.pth")
         state = torch.tensor(state, dtype=torch.float32)
-        state = state.to(device)
-        action_torch, action = select_action(actor,state)
-        
-        # Efcfectuer l'action et observer les récompenses
-        next_state, reward, terminated, truncated, _ = env.step([action[0],action[1]])
-        
-        
-        
-        
-        done = terminated or truncated
-        gains.append(reward)
-        reward = torch.tensor([reward])
-        with torch.no_grad():
-            critic_input = state.reshape((state_size,))
-            critic_input = torch.cat([critic_input,action_torch])
-            q_value =  critic(critic_input)
-        q_value = q_value.to("cpu")
-        
-        optimizer_critic.zero_grad()
-        q_value_loss = loss_fn(q_value[0], reward)
-        losses.append(q_value_loss.item())
-        q_value_loss.requires_grad = True
-        
-        q_value_loss.backward()
-        optimizer_critic.step()
+        done = False
+        gains = []
+        losses = []
+        while not done:
+            # Choisir une action
+            long, lat = state[0][-2:]
+            state = torch.tensor(state, dtype=torch.float32)
+            state = state.to(device)
+            action_torch, action = agent.get_action(state, i_episode)
+            
+            # Efcfectuer l'action et observer les récompenses
+            next_state, reward, terminated, truncated, _ = env.step([action[0],action[1]])
+            
+            
+            
+            
+            done = terminated or truncated
+            gains.append(reward)
+            reward = torch.tensor([reward])
+            with torch.no_grad():
+                critic_input = state.reshape((state_size,))
+                critic_input = torch.cat([critic_input,action_torch])
+                q_value =  agent.get_q_value(critic_input)
+            q_value = q_value.to("cpu")
+            
+            
+            q_value_loss = agent.update_critics(q_value[0], reward)
+            
 
-        optimizer_actor.zero_grad()
-        policy_loss = -q_value.mean()
-        policy_loss.requires_grad = True
-        policy_loss.backward()
-        optimizer_actor.step()
+            policy_loss = agent.update_actor(q_value)
 
-        state = next_state
-        
-        
-        if (np.sqrt(long**2 + lat**2) > 70):
-            done = True
-    gains_totaux.append(np.mean(gains))
-    print(f"Gains moyens sur le run {i_episode} est : {np.mean(gains)}")
-    print(f"Pertes moyenness sur le run {i_episode} est : {np.mean(losses)}")
-    print()
-    writer.add_scalar("Loss/train", np.mean(losses), i_episode)
-    writer.add_scalar("Rewards/train", np.mean(gains), i_episode)
+            state = next_state
+            
+            losses.append(q_value_loss.item())
+            if (np.sqrt(long**2 + lat**2) > 70):
+                done = True
+        writer.add_scalar("Loss/train", np.mean(losses), i_episode)
+        writer.add_scalar("Rewards/train", np.mean(gains), i_episode)
 
-writer.close()
+    writer.close()
+
     
-        
 
+if __name__ == '__main__':
+    processes = 5
+    # initialiser une liste pour stocker les processus
+    procs = []
+    a2c =  A2C(state_size, action_size)
+    for i in range(processes):
+        proc = mp.Process(target=train, args=(a2c, i))
+        print(i)
+        proc.start()
+        procs.append(proc)
+
+    for proc in procs:
+        proc.join()
+        
+    torch.save(a2c.actor.state_dict(), "actor.pth")
+    torch.save(a2c.critic.state_dict(), "critic.pth")
