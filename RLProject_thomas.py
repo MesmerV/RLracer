@@ -6,42 +6,14 @@ import torch.nn as nn
 import torch.optim as optim
 import multiprocessing as mp
 import torch.nn.functional as F
+
 from torch.utils.tensorboard import SummaryWriter
 import warnings
 warnings.filterwarnings("ignore")
-learning_rate = 1e-3
-n_episode = 100
+learning_rate = 1e-4
+n_episode = 500
 # Définir le modèle de l'agent
-class model(nn.Module):
-    def __init__(self, n_observations, n_actions):
-        super(model, self).__init__()
-        self.n_input = n_observations
-        self.layer1 = nn.Linear(n_observations, 64)
-        self.layer2 = nn.Linear(64, 128)
-        self.layer3 = nn.Linear(128, 128)
-        self.layer4 = nn.Linear(128, 256)
-        self.layer5 = nn.Linear(256,256)
-        self.layer6 = nn.Linear(256, 128)
-        self.layer7 = nn.Linear(128, 64)
-        self.layer8 = nn.Linear(64,16)
-        self.layer9 = nn.Linear(16,16)
-        self.layer10 = nn.Linear(16, n_actions)
-
-    # Called with either one element to determine next action, or a batch
-    # during optimization. Returns tensor([[left0exp,right0exp]...]).
-    def forward(self, x):
-        x = x.view(-1,self.n_input)
-        x = x.float()
-        x = F.relu(self.layer1(x))
-        x = F.relu(self.layer2(x))
-        x = F.relu(self.layer3(x))
-        x = F.relu(self.layer4(x))
-        x = F.relu(self.layer5(x))
-        x = F.relu(self.layer6(x))
-        x = F.relu(self.layer7(x))
-        x = F.relu(self.layer8(x))
-        x = F.relu(self.layer9(x))
-        return self.layer10(x)
+from car_model import model
 class A2C():
     def __init__(self, n_observations, n_actions):
         self.actor = model(n_observations, n_actions).to(device)
@@ -50,41 +22,44 @@ class A2C():
         self.optimizer_critic = optim.Adam(self.critic.parameters(), lr= learning_rate)
         self.loss_fn = nn.MSELoss()
     def get_q_value(self,critic_input):
-        return self.critic(critic_input)
+        return self.critic(critic_input, )
     
     def get_action(self,state, episode):
         
         #std_v = 0.9 - 0.5 *np.min([episode/100,1])
-        std_v = 0.9 - 0.5 *episode/n_episode
-        accel, angle = self.actor(state)[0]
-        accel =  torch.normal(accel, std=std_v)
-        accel = torch.clamp(accel, -4, 4)
+        std_v = 1 - 0.75 *episode/n_episode
+        actions = self.actor(state)
+        accel, angle = actions[0].clone().detach().numpy()
+        #accel, angle = self.actor(state)[0]
+        accel =  np.random.normal(accel, std_v)
+        accel = np.clip(accel, -5, 5)
 
         std_theta =  0.3 - (0.05-0.3)*episode/n_episode
-        angle =  torch.normal(angle, std=std_theta)
-        angle = torch.clamp(angle, -0.78, 0.78)
+        angle =  np.random.normal(angle, std_theta)
+        angle = np.clip(angle, -0.78, 0.78)
 
-        actions = torch.tensor([accel.item(), angle.item()], device=device, dtype=torch.long)
         
         
-        copy = [accel.item(), angle.item()]
-        return actions, copy
+        
+        
+        return actions, [accel, angle]
     
     def update_critics(self,q_value, reward):
         self.optimizer_critic.zero_grad()
-        q_value_loss = self.loss_fn(q_value[0], reward)
-        q_value_loss.requires_grad = True
+        q_value_loss = self.loss_fn(q_value, reward)
+        q_value_loss.backward(retain_graph = True)
         
-        q_value_loss.backward()
         self.optimizer_critic.step()
         return q_value_loss
 
     def update_actor(self, q_value):
+
         self.optimizer_actor.zero_grad()
-        policy_loss = -q_value.mean()
-        policy_loss.requires_grad = True
+        policy_loss = q_value
         policy_loss.backward()
+        
         self.optimizer_actor.step()
+        
         return policy_loss
 
 # Initialiser l'environnement
@@ -115,7 +90,7 @@ def get_env():
 
         }
     return env
-device = "cuda"
+device = "cpu"
 env= get_env()
 obs, info = env.reset()
 try:
@@ -168,18 +143,20 @@ def train(agent, seed):
             
             done = terminated or truncated
             gains.append(reward)
-            reward = torch.tensor([reward])
-            with torch.no_grad():
-                critic_input = state.reshape((state_size,))
-                critic_input = torch.cat([critic_input,action_torch])
-                q_value =  agent.get_q_value(critic_input)
-            q_value = q_value.to("cpu")
+            reward = torch.tensor([reward], dtype=torch.float)
+            critic_input = state.reshape((1,state_size,))
+            
+            critic_input = torch.cat([critic_input,action_torch],dim = 1 )
             
             
-            q_value_loss = agent.update_critics(q_value[0], reward)
             
 
-            policy_loss = agent.update_actor(q_value)
+            q_value =  agent.get_q_value(critic_input)
+            q_value_loss = agent.update_critics(q_value, reward)
+            
+            q_value_actor = -agent.get_q_value(critic_input)
+            policy_loss = agent.update_actor(q_value_actor)
+            
 
             state = next_state
             env.render()
