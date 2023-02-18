@@ -10,8 +10,8 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 import warnings
 warnings.filterwarnings("ignore")
-learning_rate = 1e-4
-n_episode = 500
+learning_rate = 1e-3
+n_episode = 1000
 # Définir le modèle de l'agent
 from car_model import model
 class A2C():
@@ -27,14 +27,14 @@ class A2C():
     def get_action(self,state, episode):
         
         #std_v = 0.9 - 0.5 *np.min([episode/100,1])
-        std_v = 1 - 0.75 *episode/n_episode
+        std_v = 0.9 - (0.03-0.9) *episode/n_episode
         actions = self.actor(state)
         accel, angle = actions[0].clone().detach().numpy()
         #accel, angle = self.actor(state)[0]
         accel =  np.random.normal(accel, std_v)
         accel = np.clip(accel, -5, 5)
 
-        std_theta =  0.3 - (0.05-0.3)*episode/n_episode
+        std_theta =  0.5 - (0.005-0.5)*episode/n_episode
         angle =  np.random.normal(angle, std_theta)
         angle = np.clip(angle, -0.78, 0.78)
 
@@ -115,10 +115,10 @@ def train(agent, seed):
         if (i_episode % 150 == 0):
             env.config["duration"] = 25
         state, info = env.reset()
-        if (i_episode % 100 == 0):
+        if (i_episode % 100 ==0  and i_episode != 0):
             torch.save(agent.actor.state_dict(), "actor.pth")
             torch.save(agent.critic.state_dict(), "critic.pth")
-        
+            print(i_episode)
         
         state = state[0:2]
         
@@ -172,7 +172,7 @@ def train(agent, seed):
     
 
 if __name__ == '__main__':
-    processes = 1
+    processes = 8
     # initialiser une liste pour stocker les processus
     procs = []
     a2c =  A2C(state_size, action_size)
