@@ -10,26 +10,28 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 import warnings
 warnings.filterwarnings("ignore")
-learning_rate = 1e-3
+learning_rate = 5e-5
 n_episode = 1000
 # Définir le modèle de l'agent
-from car_model import model
+from car_model import Actor, Critic
 class A2C():
     def __init__(self, n_observations, n_actions):
-        self.actor = model(n_observations, n_actions).to(device)
-        self.critic = model(n_observations+n_actions, 1).to(device)
+        self.actor = Actor(n_observations, n_actions).to(device)
+        self.critic = Critic(n_observations+n_actions, 1).to(device)
         self.optimizer_actor = optim.Adam(self.actor.parameters(), lr=learning_rate)
         self.optimizer_critic = optim.Adam(self.critic.parameters(), lr= learning_rate)
         self.loss_fn = nn.MSELoss()
     def get_q_value(self,critic_input):
-        return self.critic(critic_input, )
+        return self.critic(critic_input )
     
     def get_action(self,state, episode):
         
         #std_v = 0.9 - 0.5 *np.min([episode/100,1])
         std_v = 0.9 - (0.03-0.9) *episode/n_episode
         actions = self.actor(state)
-        accel, angle = actions[0].clone().detach().numpy()
+        temp = actions[0].clone()
+        temp = temp.detach()
+        accel, angle = temp.cpu().numpy()
         #accel, angle = self.actor(state)[0]
         accel =  np.random.normal(accel, std_v)
         accel = np.clip(accel, -5, 5)
@@ -52,15 +54,22 @@ class A2C():
         self.optimizer_critic.step()
         return q_value_loss
 
-    def update_actor(self, q_value):
+    def update_actor(self, action_torch, state):
 
         self.optimizer_actor.zero_grad()
-        policy_loss = q_value
-        policy_loss.backward()
+        critic_input = state.reshape((1,16))
+    
+        critic_input = torch.cat([critic_input,action_torch],dim = 1 )
+        q_value_actor = -self.get_q_value(critic_input)
         
+        q_value_actor.backward()
+        
+        for name, param in self.actor.named_parameters():
+            if param.grad is not None:
+                print(f'{name} gradient: {param.grad}')
         self.optimizer_actor.step()
         
-        return policy_loss
+        return q_value_actor
 
 # Initialiser l'environnement
 def get_env():
@@ -68,7 +77,7 @@ def get_env():
     env.config["controlled_vehicles"] = 1
     env.config["manual_control"]= False
     env.config["duration"] =12
-    env.config["lane_centering_cost"] = 10
+    env.config["lane_centering_cost"] = 2
     env.config['other_vehicles']= 0
     env.config["action"] = {
                 "type": "ContinuousAction",
@@ -90,7 +99,7 @@ def get_env():
 
         }
     return env
-device = "cpu"
+device = "cuda"
 env= get_env()
 obs, info = env.reset()
 try:
@@ -134,7 +143,6 @@ def train(agent, seed):
             state = torch.tensor(state, dtype=torch.float32)
             state = state.to(device)
             action_torch, action = agent.get_action(state, i_episode)
-            
             # Efcfectuer l'action et observer les récompenses
             next_state, reward, terminated, truncated, _ = env.step([action[0],action[1]])
             
@@ -144,7 +152,8 @@ def train(agent, seed):
             done = terminated or truncated
             gains.append(reward)
             reward = torch.tensor([reward], dtype=torch.float)
-            critic_input = state.reshape((1,state_size,))
+            reward = reward.to(device)
+            critic_input = state.reshape((1,state_size))
             
             critic_input = torch.cat([critic_input,action_torch],dim = 1 )
             
@@ -154,14 +163,16 @@ def train(agent, seed):
             q_value =  agent.get_q_value(critic_input)
             q_value_loss = agent.update_critics(q_value, reward)
             
-            q_value_actor = -agent.get_q_value(critic_input)
-            policy_loss = agent.update_actor(q_value_actor)
+
+            
+            
+            actor_loss = agent.update_actor(action_torch, state)
             
 
             state = next_state
             env.render()
             losses.append(q_value_loss.item())
-            if (np.sqrt(long**2 + lat**2) > 70):
+            if (np.sqrt(long**2 + lat**2) > 65):
                 done = True
         writer.add_scalar("Loss/train", np.mean(losses), i_episode)
         writer.add_scalar("Rewards/train", np.mean(gains), i_episode)
@@ -172,7 +183,7 @@ def train(agent, seed):
     
 
 if __name__ == '__main__':
-    processes = 8
+    processes = 1
     # initialiser une liste pour stocker les processus
     procs = []
     a2c =  A2C(state_size, action_size)
