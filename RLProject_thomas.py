@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 import warnings
 warnings.filterwarnings("ignore")
-learning_rate = 5e-5
+learning_rate = 5e-4
 n_episode = 1000
 # Définir le modèle de l'agent
 from car_model import Actor, Critic
@@ -135,7 +135,7 @@ def get_action(state, episode):
     #std_theta =  0.15 - (0.005-0.15)*episode/n_episode
     std_theta = 0.15
     angle =  np.random.normal(angle, std_theta)
-    angle = np.clip(angle, -0.78, 0.78)
+    angle = np.clip(angle, -0.6, 0.6)
 
     
     
@@ -208,6 +208,7 @@ def train(seed):
             state = torch.tensor(state, dtype=torch.float32)
             state = state.to(device)
             action_torch, action = get_action(state, i_episode)
+            
             # Efcfectuer l'action et observer les récompenses
             next_state, reward, terminated, truncated, _ = env.step([action[0],action[1]])
             
@@ -248,14 +249,7 @@ if __name__ == '__main__':
     processes = 3
     # initialiser une liste pour stocker les processus
     procs = []
-    for i in range(processes):
-        proc = mp.Process(target=train, args=(i,))
-        print(i)
-        proc.start()
-        procs.append(proc)
-
-    for proc in procs:
-        proc.join()
+    train(1)
         
     torch.save(actor.state_dict(), "actor.pth")
     torch.save(critic.state_dict(), "critic.pth")
