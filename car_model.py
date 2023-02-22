@@ -39,8 +39,8 @@ class Critic(nn.Module):
         x = F.relu(self.layer9(x))
         x = F.relu(self.layer10(x))
         x = F.relu(self.layer11(x))
-        x = F.relu(self.layer12(x))"""
-        x = F.relu(self.layer13(x))
+        x = F.relu(self.layer12(x))
+        x = F.relu(self.layer13(x))"""
         x = F.relu(self.layer14(x))
         x = F.relu(self.layer15(x))
 
@@ -54,8 +54,8 @@ class Actor(nn.Module):
         self.layer1 = nn.Linear(n_observations, 64)
         self.layer2 = nn.Linear(64, 128)
         self.layer3 = nn.Linear(128, 256)
-        """self.layer4 = nn.Linear(256, 512)
-        self.layer5 = nn.Linear(512,1024)
+        self.layer4 = nn.Linear(256, 512)
+        """self.layer5 = nn.Linear(512,1024)
         self.layer6 = nn.Linear(1024,2048)
         self.layer7 = nn.Linear(2048,5096)
         self.layer8 = nn.Linear(5096,5096)
@@ -63,8 +63,8 @@ class Actor(nn.Module):
         self.layer10 = nn.Linear(5096,5096)
         self.layer11 = nn.Linear(5096,2048)
         self.layer12 = nn.Linear(2048,1024)
-        self.layer13 = nn.Linear(1024,512)
-        self.layer14 = nn.Linear(512, 256)"""
+        self.layer13 = nn.Linear(1024,512)"""
+        self.layer14 = nn.Linear(512, 256)
         self.layer15 = nn.Linear(256, 128)
         self.layer16 = nn.Linear(128,32)
         self.layer17 = nn.Linear(32,16)
@@ -78,8 +78,8 @@ class Actor(nn.Module):
         x = F.relu(self.layer1(x))
         x = F.relu(self.layer2(x))
         x = F.relu(self.layer3(x))
-        """x = F.relu(self.layer4(x))
-        x = F.relu(self.layer5(x))
+        x = F.relu(self.layer4(x))
+        """x = F.relu(self.layer5(x))
         x = F.relu(self.layer6(x))
         x = F.relu(self.layer7(x))
         x = F.relu(self.layer8(x))
@@ -87,8 +87,8 @@ class Actor(nn.Module):
         x = F.relu(self.layer10(x))
         x = F.relu(self.layer11(x))
         x = F.relu(self.layer12(x))
-        x = F.relu(self.layer13(x))
-        x = F.relu(self.layer14(x))"""
+        x = F.relu(self.layer13(x))"""
+        x = F.relu(self.layer14(x))
         x = F.relu(self.layer15(x))
         x = F.relu(self.layer16(x))
         x = F.relu(self.layer17(x))
@@ -99,7 +99,7 @@ def get_env():
     env = gym.make("racetrack-v0")
     env.config["controlled_vehicles"] = 1
     env.config["manual_control"]= False
-    env.config["duration"] =30
+    env.config["duration"] =10
     env.config["lane_centering_cost"] = 2
     env.config['other_vehicles']= 0
     env.config["action"] = {
