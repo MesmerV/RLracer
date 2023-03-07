@@ -15,9 +15,10 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-TRAIN = False
-TRAINING_STEPS = 1e5
+TRAIN = True
+TRAINING_STEPS = 1e4
 USE_PREVIOUS_MODEL = True
+PLAY = False
 MANUAL = False
 
 def CreateEnv():
@@ -117,33 +118,35 @@ if __name__ == '__main__':
         model.save("racetrack_ppo/model_PPO")
         del model
 
-    # Run the algorithm
-    model = PPO.load("racetrack_ppo/model_PPO", env=env)
-    
-    # dl racetrack as baseline
-    env = CreateEnv()
-    ConfigureMultiAgent(env, 1)
+    if PLAY:    
+
+        # Run the algorithm
+        model = PPO.load("racetrack_ppo/model_PPO", env=env)
+
+        # dl racetrack as baseline
+        env = CreateEnv()
+        ConfigureMultiAgent(env, 1)
 
 
-    env = RecordVideo(env, video_folder="racetrack_ppo/videos", episode_trigger=lambda e: True)
-    env.unwrapped.set_record_video_wrapper(env)
-    
-    print(env.config)
-    
-    done = truncated = False
-    obs, info = env.reset()
-    print("number of obs: ",len(obs))
+        env = RecordVideo(env, video_folder="racetrack_ppo/videos", episode_trigger=lambda e: True)
+        env.unwrapped.set_record_video_wrapper(env)
 
-    while not (done or truncated):
-        # Predict
+        print(env.config)
 
-        # Dispatch the observations to the model to get the tuple of actions
-        actions = tuple(model.predict(obs_i)[0] for obs_i in obs)
-        #actions, _states = model.predict(obs, deterministic=True)
-        
-        # Execute the actions
-        obs, reward, done, truncated, info = env.step(actions)
-        
-        # Render
-        env.render()
+        done = truncated = False
+        obs, info = env.reset()
+        print("number of obs: ",len(obs))
+
+        while not (done or truncated):
+            # Predict
+
+            # Dispatch the observations to the model to get the tuple of actions
+            actions = tuple(model.predict(obs_i)[0] for obs_i in obs)
+            #actions, _states = model.predict(obs, deterministic=True)
+
+            # Execute the actions
+            obs, reward, done, truncated, info = env.step(actions)
+
+            # Render
+            env.render()
     env.close()
