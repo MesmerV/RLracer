@@ -15,7 +15,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-TRAIN = True
+TRAIN = False
 TRAINING_STEPS = 1e5
 USE_PREVIOUS_MODEL = True
 MANUAL = False
