@@ -15,20 +15,20 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-TRAIN = False
-USE_PREVIOUS_MODEL = False
+TRAIN = True
+TRAINING_STEPS = 1e5
+USE_PREVIOUS_MODEL = True
 MANUAL = False
 
 def CreateEnv():
     # dl racetrack as baseline
     env = gym.make("racetrack-v0")
 
-    # General Config ( configure in racetrack_env for training)
+    # General Config ( *configure in racetrack_env for training* )
     env.configure({ 
         "collision_reward": -1.5,
         "lane_centering_cost": 4,
         "lane_centering_reward": 3,
-        "reward_speed_range": [10, 30],
         "high_speed_reward": 1.5,
         "action_reward": -0.5,
         
@@ -87,7 +87,7 @@ def ConfigureMultiAgent(env,agent_num):
 
 if __name__ == '__main__':
 
-    n_cpu = os.cpu_count() - 1
+    n_cpu = os.cpu_count() - 5
     #env = CreateEnv()
     env = make_vec_env("racetrack-v0", n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
 
@@ -104,7 +104,7 @@ if __name__ == '__main__':
                 n_steps=batch_size * 12 // n_cpu,
                 batch_size=batch_size,
                 n_epochs=10,
-                learning_rate=1e-4,
+                learning_rate=2e-4,
                 gamma=0.9,
                 verbose=3,
                 tensorboard_log="racetrack_ppo/")
@@ -113,7 +113,7 @@ if __name__ == '__main__':
             model = PPO.load("racetrack_ppo/model_PPO", env=env)
 
         # Train the model
-        model.learn(total_timesteps=int(1e6))
+        model.learn(total_timesteps=int(TRAINING_STEPS))
         model.save("racetrack_ppo/model_PPO")
         del model
 
