@@ -13,7 +13,8 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.multiprocessing as mp
 import warnings
 warnings.filterwarnings("ignore")
-learning_rate = 0.00001
+learning_rate_critic = 0.000001
+learning_rate_actor = 0.0001
 n_episode = 4000
 epsilon = 0
 # Définir le modèle de l'agent
@@ -38,8 +39,10 @@ action_size = 2
 state_size = 8
 actor = Actor(state_size,action_size)
 critic = Critic(state_size + action_size,1)
-optimizer_actor = optim.Adam(actor.parameters(), lr=learning_rate)
-optimizer_critic = optim.Adam(critic.parameters(), lr=learning_rate)
+optimizer_actor = optim.Adam(actor.parameters(), lr=learning_rate_actor)
+optimizer_critic = optim.Adam(critic.parameters(), lr=learning_rate_critic)
+lr_scheduler_actor = torch.optim.lr_scheduler.StepLR(optimizer=optimizer_actor, step_size = 500, gamma=0.3)
+lr_scheduler_critic = torch.optim.lr_scheduler.StepLR(optimizer=optimizer_critic, step_size = 100, gamma=0.3)
 loss_fn = nn.MSELoss()
 actor = actor.to(device)
 critic = critic.to(device)
@@ -51,19 +54,19 @@ def get_action(state):
     #std_v = 0.9 - 0.5 *np.min([episode/100,1])
     #std_v = 0.9 - (0.03-0.9) *episode/n_episode
     
-    std_v = 7
+    std_v = 0.1
     actions = actor(state)
     temp = actions[0].clone()
     temp = temp.detach()
     accel, angle = temp.cpu().numpy()
     #accel, angle = self.actor(state)[0]
     accel =  np.random.normal(accel, std_v)
-    accel = np.clip(accel, 0, 40)
+    accel = np.clip(accel, 0, 10)
 
     #std_theta =  0.1 - (0.005-0.1)*episode/n_episode
-    std_theta = 0.3
+    std_theta = 0.1
     angle =  np.random.normal(angle, std_theta)
-    angle = np.clip(angle, -0.78, 0.78)
+    #angle = np.clip(angle, -0.78, 0.78)
         
 
     
@@ -73,7 +76,7 @@ def get_action(state):
     return actions, [accel, angle]
 
 def update_critics(q_value, reward):
-    optimizer_critic.zero_grad()
+    
     q_value_loss = loss_fn(q_value, reward)
     q_value_loss.backward(retain_graph = True)
     """for name, param in critic.named_parameters():
@@ -103,11 +106,9 @@ def update_actor(action_torch, state):
     
 torch.set_grad_enabled(True)
 def train(seed):
-    optimizer_actor = optim.Adam(actor.parameters(), lr=learning_rate)
-    optimizer_critic = optim.Adam(critic.parameters(), lr=learning_rate)
+    
     loss_fn = nn.MSELoss()
-    lr_scheduler_actor = torch.optim.lr_scheduler.StepLR(optimizer=optimizer_actor, step_size = 100, gamma=0.5)
-    lr_scheduler_critic = torch.optim.lr_scheduler.StepLR(optimizer=optimizer_critic, step_size = 100, gamma=0.5)
+    
     env = env= get_env()
     writer = SummaryWriter(f"runs/{seed}") 
     # Boucle d'entraînement de l'agent
@@ -122,7 +123,7 @@ def train(seed):
         if (i_episode % 100 ==0  and i_episode != 0):
             
             print(i_episode)
-        if (i_episode % 500 == 0 and i_episode != 0):
+        if (i_episode % 600 == 0 and i_episode != 0):
             env.config["duration"] += 5
         
         done = False
@@ -153,16 +154,16 @@ def train(seed):
             
             
             
-            optimizer_critic.zero_grad()
+            
+
             state_input = state.reshape((1,state_size))
-            critic_input = torch.cat([state_input,action_torch],dim = 1 )
+            critic_input = torch.cat([state_input,torch.tensor(action, device=device).reshape(1,2)],dim = 1 ).float()
+            
             q_value =  get_q_value(critic_input)
             q_value_loss = update_critics(q_value, reward)
+            optimizer_critic.zero_grad()
             update_actor(action_torch, state)
-            """for name, param in critic.named_parameters():
-                if param.grad is not None:
-                    print(f'{name} gradient: {param.grad}')
-            optimizer_critic.step()"""
+            
 
 
 
@@ -174,8 +175,8 @@ def train(seed):
             env.render()
             losses.append(q_value_loss.item())
             
-        lr_scheduler_critic.step()
-        lr_scheduler_actor.step()
+        """lr_scheduler_critic.step()
+        lr_scheduler_actor.step()"""
         writer.add_scalar("Loss/train", np.mean(losses), i_episode)
         writer.add_scalar("Rewards/train", np.mean(gains), i_episode)
         if (i_episode == 1):
