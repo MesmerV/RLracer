@@ -24,6 +24,9 @@ Then you clone the fork of the repo of the environment:
 ```
 https://github.com/maumlima/highway-env.git
 ```
+
+Rename the repo highway-env into "highway_env"
+
 And you finally install it:
 
 ```
