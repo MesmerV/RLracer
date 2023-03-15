@@ -5,7 +5,7 @@ This repository is the repo for the project of INF581 of the Ecole Polytechnique
 Frist of all, you must create a new conda environmnent. 
 
 ```
-conda create -n RLgym
+conda create -n RLgym python=3.9
 conda activate RLgym
 ```
 
