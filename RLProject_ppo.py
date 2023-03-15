@@ -90,7 +90,7 @@ def ConfigureMultiAgent(env,agent_num):
 
 if __name__ == '__main__':
 
-    n_cpu = os.cpu_count() - 5
+    n_cpu = os.cpu_count() - 1
     #env = CreateEnv()
     env = make_vec_env("racetrack-v0", n_envs=n_cpu, vec_env_cls=SubprocVecEnv)
 
@@ -123,7 +123,7 @@ if __name__ == '__main__':
     if PLAY:    
 
         # Run the algorithm
-        model = PPO.load("racetrack_ppo/model_PPO", env=env)
+        model = PPO.load("racetrack_ppo/model_PPO4", env=env)
 
         # dl racetrack as baseline
         env = CreateEnv()
