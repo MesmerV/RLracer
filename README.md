@@ -12,7 +12,7 @@ conda activate RLgym
 
 Then install dependencies
 ```
-pip install numpy matplotlib pygame moviepy git+https://github.com/carlosluis/stable-baselines3@fix_tests
+pip install numpy matplotlib pygame moviepy tensorboard git+https://github.com/carlosluis/stable-baselines3@fix_tests 
 ```
 
 Then you can clone this repository:
