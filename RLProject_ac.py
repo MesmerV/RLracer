@@ -13,9 +13,9 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.multiprocessing as mp
 import warnings
 warnings.filterwarnings("ignore")
-learning_rate_critic = 0.000001
-learning_rate_actor = 0.0001
-n_episode = 4000
+learning_rate_critic = 0.001
+learning_rate_actor = 0.001
+n_episode = 10000
 epsilon = 0
 # Définir le modèle de l'agent
 from car_model import Actor, Critic, get_env
@@ -36,39 +36,41 @@ except:
     print(obs.shape)
     print(state_size)
 action_size = 2
-state_size = 8
+state_size = n1*n2*n3
 actor = Actor(state_size,action_size)
 critic = Critic(state_size + action_size,1)
 optimizer_actor = optim.Adam(actor.parameters(), lr=learning_rate_actor)
 optimizer_critic = optim.Adam(critic.parameters(), lr=learning_rate_critic)
-lr_scheduler_actor = torch.optim.lr_scheduler.StepLR(optimizer=optimizer_actor, step_size = 500, gamma=0.3)
-lr_scheduler_critic = torch.optim.lr_scheduler.StepLR(optimizer=optimizer_critic, step_size = 100, gamma=0.3)
+lr_scheduler_actor = torch.optim.lr_scheduler.StepLR(optimizer=optimizer_actor, step_size = 100, gamma=0.3)
+lr_scheduler_critic = torch.optim.lr_scheduler.StepLR(optimizer=optimizer_critic, step_size = 150, gamma=0.3)
 loss_fn = nn.MSELoss()
 actor = actor.to(device)
 critic = critic.to(device)
 def get_q_value(critic_input):
     return critic(critic_input )
 
-def get_action(state):
+def get_action(state,episode):
     
     #std_v = 0.9 - 0.5 *np.min([episode/100,1])
     #std_v = 0.9 - (0.03-0.9) *episode/n_episode
     
-    std_v = 0.1
+    std_v = 1
     actions = actor(state)
     temp = actions[0].clone()
     temp = temp.detach()
     accel, angle = temp.cpu().numpy()
     #accel, angle = self.actor(state)[0]
     accel =  np.random.normal(accel, std_v)
-    accel = np.clip(accel, 0, 10)
-
-    #std_theta =  0.1 - (0.005-0.1)*episode/n_episode
-    std_theta = 0.1
+    accel = np.clip(accel, 0, 20)
+    
+    std_theta =  np.abs(angle)/5
+    std_theta = 0.2 
+    angle = np.clip(angle, -0.78, 0.78)
+    
     angle =  np.random.normal(angle, std_theta)
-    #angle = np.clip(angle, -0.78, 0.78)
+    print(angle)
         
-
+    
     
     
     
@@ -121,7 +123,9 @@ def train(seed):
         
         state, info = env.reset()
         if (i_episode % 100 ==0  and i_episode != 0):
-            
+            print("save")
+            torch.save(actor.state_dict(), "actor.pth")
+            torch.save(critic.state_dict(), "critic.pth")
             print(i_episode)
         if (i_episode % 600 == 0 and i_episode != 0):
             env.config["duration"] += 5
@@ -133,10 +137,10 @@ def train(seed):
             # Choisir une action
             optimizer_actor.zero_grad()
             optimizer_critic.zero_grad()
-            state = state[0]
+            state = state[0:2]
             state = torch.tensor(state, dtype=torch.float32)
             state = state.to(device)
-            action_torch, action = get_action(state)
+            action_torch, action = get_action(state, i_episode)
             # Efcfectuer l'action et observer les récompenses
             next_state, reward, terminated, truncated, _ = env.step([action[0],action[1]])
             
@@ -175,15 +179,14 @@ def train(seed):
             env.render()
             losses.append(q_value_loss.item())
             
-        """lr_scheduler_critic.step()
-        lr_scheduler_actor.step()"""
+        lr_scheduler_critic.step()
+        lr_scheduler_actor.step()
         writer.add_scalar("Loss/train", np.mean(losses), i_episode)
         writer.add_scalar("Rewards/train", np.mean(gains), i_episode)
         if (i_episode == 1):
             print(1)
         if (np.mean(gains) > best_reward):
-            torch.save(actor.state_dict(), "actor.pth")
-            torch.save(critic.state_dict(), "critic.pth")
+            
             best_reward = np.mean(gains)
 
     writer.close()
