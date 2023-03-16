@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 TRAIN = False
 TRAINING_STEPS = 1e4
 USE_PREVIOUS_MODEL = True
-NUM_AGENTS = 3
+NUM_AGENTS = 2
 PLAY = True
 MANUAL = False
 
@@ -34,7 +34,7 @@ def CreateEnv():
         "high_speed_reward": 1.5,
         "action_reward": -0.5,
 
-        "other_vehicles": 8,
+        "other_vehicles": 5,
         "screen_width": 600,
         "show_trajectories": False,
         "screen_heigth": 600
@@ -123,7 +123,7 @@ if __name__ == '__main__':
     if PLAY:    
 
         # Run the algorithm
-        model = PPO.load("racetrack_ppo/model_PPO4", env=env)
+        model = PPO.load("racetrack_ppo/model_PPO1", env=env)
 
         # dl racetrack as baseline
         env = CreateEnv()
