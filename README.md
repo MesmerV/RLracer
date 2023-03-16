@@ -2,7 +2,7 @@
 
 This repository hosts our project made for the Ecole Polytechnique INF581 RL course. It contains all the required scripts to start a training for autonomous agent in our custom environment.
 
-In our environment we train a simple model that controls the wheel and the trottle of a simple car (in yellow) that must stay on track and avoid other agents (in blue).
+In our environment we train a simple model that controls the wheel and the throttle of a simple car (in yellow) that must stay on track and avoid other agents (in blue).
 
 
 <img src="img/racetrack-image.png"
